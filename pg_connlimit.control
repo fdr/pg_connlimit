@@ -1,0 +1,4 @@
+comment = 'limit role connectivity count without catalog access'
+default_version = '1.0'
+module_pathname = '$libdir/pg_connlimit'
+relocatable = true

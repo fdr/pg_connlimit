@@ -61,6 +61,7 @@ static char *connlimitDirectory = NULL;
 /* Internal function definitions. */
 static void client_auth_hook(Port *port, int status);
 static void enforce_limit(char *rolname);
+static bool isalphanum(char *str);
 
 /*
  * _PG_init()			- library load-time initialization
@@ -112,6 +113,34 @@ client_auth_hook(Port *port, int status)
 
 }
 
+/* Check if the given NUL-terminated string is ASCII-alphanumeric. */
+static bool
+isalphanum(char *str)
+{
+	char c;
+
+	c = *str;
+
+	/* An empty string is considered non-alphanumeric */
+	if (c == '\0')
+		return false;
+
+	do
+	{
+		if ((c >= '0' && c <= '9') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= 'a' && c <= 'z'))
+		{
+			str += 1;
+			c = *str;
+		}
+		else
+			return false;
+	} while (c != '\0');
+
+	return true;
+}
+
 static void
 enforce_limit(char *rolname)
 {
@@ -131,6 +160,13 @@ enforce_limit(char *rolname)
 
 	/* Could not locate a matching role: early exit. */
 	if (!OidIsValid(roleid))
+		return;
+
+	/*
+	 * Role is not alphanumeric.  Don't let it be used as input to open(), to
+	 * avoid traversal attacks (e.g. contained '.' characters).
+	 */
+	if (!isalphanum(rolname))
 		return;
 
 	/* Compute path to probe for connection limit enforcement. */

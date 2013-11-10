@@ -179,7 +179,8 @@ enforce_limit(char *rolname)
 	save_errno = errno;
 
 	/* Try to get a file descriptor to the computed path. */
-	do {
+	do
+	{
 		errno = 0;
 		fd = open(pathBuf.data, O_RDONLY);
 	} while (errno == EAGAIN);
@@ -195,7 +196,8 @@ enforce_limit(char *rolname)
 
 	/* Leave space for the NUL terminator. */
 	remaining = limitBuf.maxlen - sizeof '\0';
-	do {
+	do
+	{
 		ssize_t n;
 
 		errno = 0;

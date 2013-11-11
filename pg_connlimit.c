@@ -42,6 +42,7 @@
 #include "fmgr.h"
 #include "lib/stringinfo.h"
 #include "libpq/auth.h"
+#include "storage/fd.h"
 #include "storage/procarray.h"
 #include "utils/acl.h"
 #include "utils/elog.h"
@@ -115,13 +116,12 @@ client_auth_hook(Port *port, int status)
 static void
 enforce_limit(char *rolname)
 {
-	Oid					 roleid;
-	int					 fd;
-	StringInfoData		 pathBuf;
-	int					 save_errno;
-	StringInfoData		 limitBuf;
-	ssize_t				 remaining;
-	long int			 limit;
+	Oid					roleid;
+	File				file;
+	StringInfoData		pathBuf;
+	int					save_errno;
+	StringInfoData		limitBuf;
+	long int			limit;
 
 	/* Expected GUC is not configured: early exit. */
 	if (connlimitDirectory == NULL)
@@ -149,14 +149,10 @@ enforce_limit(char *rolname)
 
 	/* Save errno so it can later be restored as a courtesy to callers. */
 	save_errno = errno;
+	errno = 0;
 
 	/* Try to get a file descriptor to the computed path. */
-	do
-	{
-		errno = 0;
-		fd = open(pathBuf.data, O_RDONLY);
-	} while (errno == EAGAIN);
-
+	file = PathNameOpenFile(pathBuf.data, O_RDONLY, 0400);
 	if (errno != 0)
 	{
 		/* Couldn't open the connection limit file: do not enforce. */
@@ -165,21 +161,9 @@ enforce_limit(char *rolname)
 
 	/* Try to read the limit data from that file descriptor. */
 	initStringInfo(&limitBuf);
-
-	/* Leave space for the NUL terminator. */
-	remaining = limitBuf.maxlen - sizeof '\0';
-	do
-	{
-		ssize_t n;
-
-		errno = 0;
-		n = read(fd, &limitBuf.data[limitBuf.len], remaining - limitBuf.len);
-
-		if (n > 0)
-			limitBuf.len += n;
-	} while (errno == EAGAIN && limitBuf.len < remaining);
-
-	if (errno != 0 || limitBuf.len == limitBuf.maxlen)
+	AssertState(errno == 0);
+	limitBuf.len += FileRead(file, limitBuf.data, limitBuf.maxlen);
+	if (errno != 0)
 	{
 		/*
 		 * Couldn't read the file or could not find EOF within the
@@ -188,10 +172,7 @@ enforce_limit(char *rolname)
 		goto cleanup_opened;
 	}
 
-	/* Add a NUL terminator */
-	AssertState(limitBuf.len < limitBuf.maxlen);
-	limitBuf.data[limitBuf.len] = '\0';
-	limitBuf.len += 1;
+	appendStringInfoChar(&limitBuf, '\0');
 
 	/* Try to parse an integer out of the read data. */
 	AssertState(errno == 0);
@@ -220,7 +201,7 @@ enforce_limit(char *rolname)
 
 cleanup_opened:
 	pfree(limitBuf.data);
-	close(fd);
+	FileClose(file);
 
 	/* Fall-through. */
 cleanup:

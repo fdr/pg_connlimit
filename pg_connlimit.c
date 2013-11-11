@@ -40,7 +40,6 @@
 #include <unistd.h>
 
 #include "fmgr.h"
-#include "lib/stringinfo.h"
 #include "libpq/auth.h"
 #include "storage/fd.h"
 #include "storage/procarray.h"
@@ -116,12 +115,11 @@ client_auth_hook(Port *port, int status)
 static void
 enforce_limit(char *rolname)
 {
-	Oid					roleid;
-	File				file;
-	StringInfoData		pathBuf;
-	int					save_errno;
-	StringInfoData		limitBuf;
-	long int			limit;
+	Oid					 roleid;
+	FILE				*fp;
+	StringInfoData		 pathBuf;
+	int					 save_errno;
+	int					 limit;
 
 	/* Expected GUC is not configured: early exit. */
 	if (connlimitDirectory == NULL)
@@ -150,31 +148,16 @@ enforce_limit(char *rolname)
 	errno = 0;
 
 	/* Try to get a file descriptor to the computed path. */
-	file = PathNameOpenFile(pathBuf.data, O_RDONLY, 0400);
-	if (errno != 0)
+	fp = AllocateFile(pathBuf.data, "r");
+	if (fp == NULL)
 	{
 		/* Couldn't open the connection limit file: do not enforce. */
 		goto cleanup;
 	}
 
-	/* Try to read the limit data from that file descriptor. */
-	initStringInfo(&limitBuf);
-	AssertState(errno == 0);
-	limitBuf.len += FileRead(file, limitBuf.data, limitBuf.maxlen);
-	if (errno != 0)
+	if (fscanf(fp, "%d", &limit) != 1)
 	{
-		/* Couldn't read: do not enforce. */
-		goto cleanup_opened;
-	}
-
-	appendStringInfoChar(&limitBuf, '\0');
-
-	/* Try to parse an integer out of the read data. */
-	AssertState(errno == 0);
-	limit = strtol(limitBuf.data, NULL, 10);
-	if (errno != 0)
-	{
-		/* Couldn't parse the integer: do not enforce. */
+		/* Couldn't scan an integer: do not enforce. */
 		goto cleanup_opened;
 	}
 
@@ -194,8 +177,7 @@ enforce_limit(char *rolname)
 	}
 
 cleanup_opened:
-	pfree(limitBuf.data);
-	FileClose(file);
+	FreeFile(fp);
 
 	/* Fall-through. */
 cleanup:

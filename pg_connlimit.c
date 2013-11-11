@@ -109,7 +109,6 @@ client_auth_hook(Port *port, int status)
 	 */
 	if (status == STATUS_OK)
 		enforce_limit(port->user_name);
-
 }
 
 static void

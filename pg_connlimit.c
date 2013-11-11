@@ -143,9 +143,7 @@ enforce_limit(char *rolname)
 
 	/* Compute path to probe for connection limit enforcement. */
 	initStringInfo(&pathBuf);
-	appendStringInfoString(&pathBuf, connlimitDirectory);
-	appendStringInfoString(&pathBuf, "/");
-	appendStringInfoString(&pathBuf, rolname);
+	appendStringInfo(&pathBuf, "%s/%s", connlimitDirectory, rolname);
 
 	/* Save errno so it can later be restored as a courtesy to callers. */
 	save_errno = errno;

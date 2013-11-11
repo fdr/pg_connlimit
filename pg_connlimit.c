@@ -163,10 +163,7 @@ enforce_limit(char *rolname)
 	limitBuf.len += FileRead(file, limitBuf.data, limitBuf.maxlen);
 	if (errno != 0)
 	{
-		/*
-		 * Couldn't read the file or could not find EOF within the
-		 * limitBuf size: do not enforce.
-		 */
+		/* Couldn't read: do not enforce. */
 		goto cleanup_opened;
 	}
 

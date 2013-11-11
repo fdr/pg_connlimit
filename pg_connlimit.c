@@ -175,7 +175,6 @@ enforce_limit(char *rolname)
 	/* Try to parse an integer out of the read data. */
 	AssertState(errno == 0);
 	limit = strtol(limitBuf.data, NULL, 10);
-
 	if (errno != 0)
 	{
 		/* Couldn't parse the integer: do not enforce. */

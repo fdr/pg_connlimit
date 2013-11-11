@@ -98,18 +98,18 @@ _PG_init(void)
 static void
 client_auth_hook(Port *port, int status)
 {
+	if (prev_ClientAuthentication_hook != NULL)
+	{
+		/* Pre-existing hook present: call it. */
+		prev_ClientAuthentication_hook(port, status);
+	}
+
 	/*
 	 * May exit the process on account of too many backends for the
 	 * role.
 	 */
 	if (status == STATUS_OK)
 		enforce_limit(port->user_name);
-
-	if (prev_ClientAuthentication_hook != NULL)
-	{
-		/* Pre-existing hook present: call it. */
-		prev_ClientAuthentication_hook(port, status);
-	}
 
 }
 
